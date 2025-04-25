@@ -1,0 +1,9 @@
+name: llm_scratch
+channels:
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.11
+  - pytorch
+  - torchvision
+  - torchaudio
