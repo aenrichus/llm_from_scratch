@@ -9,6 +9,11 @@ with open('decay.txt', 'r', encoding='utf-8') as file:
 
 integers = tokenizer.encode(raw_text, allowed_special="all")
 print("First 20 tokens:", integers[:20])
+print(len(integers))
 
 strings = tokenizer.decode(integers)
 print("First 20 tokens:", strings[:200])
+print(len(strings))
+
+
+
