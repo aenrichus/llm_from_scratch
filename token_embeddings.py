@@ -12,4 +12,3 @@ print(embedding_layer(torch.tensor([2])))
 
 print(embedding_layer(input_ids))
 # The output of the embedding layer is a tensor of shape (4, 4) because we have 4 input IDs and the output dimension is 4.
-
