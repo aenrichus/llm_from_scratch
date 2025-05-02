@@ -8,7 +8,8 @@ inputs = torch.tensor(
      [0.05, 0.80, 0.55]] # step
 )
 
-query = inputs[1]
+# Calculate the attention scores (a, dot product)
+query = inputs[1] # (x)
 attn_scores_2 = torch.empty(inputs.shape[0])
 
 for i, x_i in enumerate(inputs):
@@ -28,3 +29,36 @@ atten_weights_2_naive = softmax_naive(attn_scores_2)
 print(atten_weights_2_naive)
 print(torch.sum(atten_weights_2_naive))
 
+# Normalize with torch softmax
+attn_weights_2 = torch.softmax(attn_scores_2, dim=0)
+print(attn_weights_2)
+print(torch.sum(attn_weights_2))
+
+# Calculate the context vector (z)
+context_vector_2 = torch.zeros(query.shape)
+for i, x_i in enumerate(inputs):
+    context_vector_2 += attn_weights_2[i] * x_i
+print(context_vector_2)
+
+# Compute attention scores for all input tokens
+attn_scores = torch.empty(6, 6)
+for i, x_i in enumerate(inputs):
+    for j, x_j in enumerate(inputs):
+        attn_scores[i][j] = torch.dot(x_i, x_j)
+print(attn_scores)
+
+# Computer attention scores with matrix multiplication
+attn_scores = torch.matmul(inputs, inputs.T)
+print(attn_scores)
+
+# Normalize the attention scores
+attn_weights = torch.softmax(attn_scores, dim=-1)
+print(attn_weights)
+
+row_2_sum = torch.sum(attn_weights[1])
+print(row_2_sum)
+print(torch.sum(attn_weights, dim=-1))
+
+context_vectors = torch.matmul(attn_weights, inputs)
+print(context_vectors)
+print(context_vector_2)
