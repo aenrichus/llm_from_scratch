@@ -89,7 +89,7 @@ print(out_norm)
 print(mean)
 print(var)
 
-torch.set_printoptions(precision=2, sci_mode=False)
+torch.set_printoptions(sci_mode=False)
 print(mean)
 print(var)
 
@@ -160,3 +160,47 @@ ffn = FeedForward(GPT_CONFIG_124M)
 x = torch.rand(2, 3, 768)
 out = ffn(x)
 print(out.shape)
+
+# Example DNN to illustrate shortcut connections
+class ExampleDNN(nn.Module):
+    def __init__(self, layer_sizes, use_shortcut):
+        super().__init__()
+        self.use_shortcut = use_shortcut
+        self.layers = nn.ModuleList([
+            nn.Sequential(nn.Linear(layer_sizes[0], layer_sizes[1]), GELU()),
+            nn.Sequential(nn.Linear(layer_sizes[1], layer_sizes[2]), GELU()),
+            nn.Sequential(nn.Linear(layer_sizes[2], layer_sizes[3]), GELU()),
+            nn.Sequential(nn.Linear(layer_sizes[3], layer_sizes[4]), GELU()),
+            nn.Sequential(nn.Linear(layer_sizes[4], layer_sizes[5]), GELU())
+        ])
+
+    def forward(self, x):
+        for layer in self.layers:
+            layer_output = layer(x)
+            if self.use_shortcut and x.shape == layer_output.shape:
+                x = x + layer_output
+            else:
+                x = layer_output
+        return x
+    
+# Test shortcut connection example
+layer_sizes = [3, 3, 3, 3, 3, 1]
+simple_input = torch.tensor([[1.0, 0.0, -1.0]])
+torch.manual_seed(123)
+model_without_shortcut = ExampleDNN(layer_sizes, use_shortcut=False)
+
+def print_gradients(model, x):
+    output = model(x)
+    target = torch.tensor([[0.0]])
+    loss = nn.MSELoss()
+    loss = loss(output, target)
+    loss.backward()
+    for name, param in model.named_parameters():
+        if 'weight' in name:
+            print(f"Gradient mean for {name}: {param.grad.abs().mean().item():.4f}")
+
+print_gradients(model_without_shortcut, simple_input)
+
+torch.manual_seed(123)
+model_with_shortcut = ExampleDNN(layer_sizes, use_shortcut=True)
+print_gradients(model_with_shortcut, simple_input)
