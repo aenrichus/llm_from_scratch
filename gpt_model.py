@@ -204,3 +204,47 @@ print_gradients(model_without_shortcut, simple_input)
 torch.manual_seed(123)
 model_with_shortcut = ExampleDNN(layer_sizes, use_shortcut=True)
 print_gradients(model_with_shortcut, simple_input)
+
+# Implementation of Transformer block
+from trainable_attention import MultiHeadAttention
+
+class TransformerBlock(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.att = MultiHeadAttention(
+            d_in=cfg["emb_dim"],
+            d_out=cfg["emb_dim"],
+            context_length=cfg["context_length"],
+            num_heads=cfg["n_heads"],
+            dropout=cfg["drop_rate"],
+            qkv_bias=cfg["qkv_bias"]
+        )
+        self.ffn = FeedForward(cfg)
+        self.ln1 = LayerNorm(cfg["emb_dim"])
+        self.ln2 = LayerNorm(cfg["emb_dim"])
+        self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
+
+    def forward(self, x):
+
+        shortcut = x # shortcut for attention block
+        x = self.ln1(x)
+        x = self.att(x)
+        x = self.drop_shortcut(x)
+        x = x + shortcut
+
+        shortcut = x # shortcut for feedforward block
+        x = self.ln2(x)
+        x = self.ffn(x)
+        x = self.drop_shortcut(x)
+        x = x + shortcut
+
+        return x
+
+# Test Transformer block
+torch.manual_seed(123)
+x = torch.rand(2, 4, 768)
+block = TransformerBlock(GPT_CONFIG_124M)
+output = block(x)
+
+print(x.shape)
+print(output.shape)
