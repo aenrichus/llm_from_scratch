@@ -39,3 +39,49 @@ token_ids = generate_text_simple(model=model,
 )
 
 print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
+
+# Calculating loss
+inputs = torch.tensor([[16833, 3626, 6100],
+                       [40, 1107, 588]])
+targets = torch.tensor([[3626, 6100, 345],
+                         [1107, 588, 11311]])
+
+with torch.no_grad():
+    logits = model(inputs)
+probabilities = torch.softmax(logits, dim=-1)
+print(probabilities.shape)
+
+token_ids = torch.argmax(probabilities, dim=-1, keepdim=True)
+print(token_ids)
+
+print(f"Targets batch 1: {token_ids_to_text(targets[0], tokenizer)}")
+print(f"Outputs batch 1: {token_ids_to_text(token_ids[0].flatten(), tokenizer)}")
+
+text_idx = 0
+target_probs_1 = probabilities[text_idx, [0, 1, 2], targets[text_idx]]
+print("Text 1:", target_probs_1)
+
+text_idx = 1
+target_probs_2 = probabilities[text_idx, [0, 1, 2], targets[text_idx]]
+print("Text 2:", target_probs_2)
+
+log_probs = torch.log(torch.cat([target_probs_1, target_probs_2]))
+print("Log probabilities:", log_probs)
+
+avg_log_probs = torch.mean(log_probs)
+print("Average log probabilities:", avg_log_probs)
+
+neg_avg_log_probs = avg_log_probs * -1.0
+print("Negative average log probabilities:", neg_avg_log_probs)
+
+print("Logits shape:", logits.shape)
+print("Targets shape:", targets.shape)
+
+logits_flat = logits.flatten(0, 1)
+targets_flat = targets.flatten()
+print("Logits flat shape:", logits_flat.shape)
+print("Targets flat shape:", targets_flat.shape)
+
+loss = nn.functional.cross_entropy(logits_flat, targets_flat)
+print("Loss:", loss)
+print(loss.item())
