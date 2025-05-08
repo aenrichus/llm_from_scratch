@@ -223,7 +223,7 @@ torch.manual_seed(123)
 model = GPTModel(GPT_CONFIG_124M)
 model.to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-1)
-num_epochs = 10
+num_epochs = 1
 train_losses, val_losses, tokens_seen = train_model_simple(
     model, train_loader, val_loader, optimizer, device, num_epochs=num_epochs,
     eval_freq=5, eval_iter=5, start_context="Every effort moves you", tokenizer=tokenizer)
@@ -242,7 +242,7 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
     ax2.plot(tokens_seen, train_losses, alpha=0)
     ax2.set_xlabel('Tokens Seen')
     fig.tight_layout()
-    plt.show()
+    # plt.show() # Uncomment to show the plot
 
 epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
 plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
@@ -259,3 +259,129 @@ token_ids = generate_text_simple(
 print(token_ids_to_text(token_ids, tokenizer))
 
 ## Temperature scaling
+vocab = {
+    "closer": 0,
+    "every": 1,
+    "effort": 2,
+    "forward": 3,
+    "inches": 4,
+    "moves": 5,
+    "pizza": 6,
+    "toward": 7,
+    "you": 8,
+}
+inverse_vocab = {v: k for k, v in vocab.items()}
+
+next_token_logits = torch.tensor([4.51, 0.89, -1.90, 6.75, 1.63, -1.62, -1.89, 6.28, 1.79])
+
+probabilities = torch.softmax(next_token_logits, dim=0)
+next_token_id = torch.argmax(probabilities).item()
+print(inverse_vocab[next_token_id])
+
+torch.manual_seed(123)
+next_token_id = torch.multinomial(probabilities, num_samples=1).item()
+print(inverse_vocab[next_token_id])
+
+def print_sampled_tokens(probabilities):
+    torch.manual_seed(123)
+    sample = [torch.multinomial(probabilities, num_samples=1).item() for i in range(1_000)]
+    sampled_ids = torch.bincount(torch.tensor(sample))
+    for i, freq in enumerate(sampled_ids):
+        if freq > 0:
+            print(f"{inverse_vocab[i]}: {freq.item()}")
+
+print_sampled_tokens(probabilities)
+
+def softmax_with_temperature(logits, temperature):
+    scaled_logits = logits / temperature
+    probabilities = torch.softmax(scaled_logits, dim=0)
+    return probabilities
+
+temperatures = [1, 0.1, 5]
+scaled_probabilities = [softmax_with_temperature(next_token_logits, T) for T in temperatures]
+x = torch.arange(len(vocab))
+bar_width = 0.15
+fig, ax = plt.subplots(figsize=(5, 3))
+for i, T in enumerate(temperatures):
+    rects = ax.bar(x + i * bar_width, scaled_probabilities[i], width=bar_width, label=f'Temperature={T}')
+ax.set_ylabel('Probability')
+ax.set_xticks(x)
+ax.set_xticklabels(vocab.keys(), rotation=90)
+ax.legend()
+plt.tight_layout()
+# plt.show() # Uncomment to show the plot
+
+## Top-k sampling
+top_k = 3
+top_logits, top_pos = torch.topk(next_token_logits, top_k)
+print("Top logits:", top_logits)
+print("Top positions:", top_pos)
+
+new_logits = torch.where(
+    condition=next_token_logits < top_logits[-1],
+    input=torch.tensor(float("-inf")),
+    other=next_token_logits
+)
+print("New logits:", new_logits)
+
+topk_probabilities = torch.softmax(new_logits, dim=0)
+print("Top-k probabilities:", topk_probabilities)
+
+# Modify text generation function to include temperature and top-k sampling
+def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k=None, eos_id=None):
+    for _ in range(max_new_tokens):
+        idx_cond = idx[:, -context_size:]
+        with torch.no_grad():
+            logits = model(idx_cond)
+            logits = logits[:, -1, :]
+            if top_k is not None:
+                top_logits, _ = torch.topk(logits, top_k)
+                min_val = top_logits[:, -1]
+                logits = torch.where(
+                    logits < min_val,
+                    torch.tensor(float("-inf")).to(logits.device),
+                    logits
+                )
+            if temperature > 0.0:
+                logits = logits / temperature
+                probabilities = torch.softmax(logits, dim=-1)
+                idx_next = torch.multinomial(probabilities, num_samples=1)
+            else:
+                idx_next = torch.argmax(logits, dim=-1, keepdim=True)
+            if idx_next == eos_id:
+                break
+            idx = torch.cat((idx, idx_next), dim=1)
+    return idx
+
+torch.manual_seed(123)
+token_ids = generate(
+    model=model, 
+    idx=text_to_token_ids("Every effort moves you", tokenizer),
+    max_new_tokens=15,
+    context_size=GPT_CONFIG_124M['context_length'],
+    temperature=1.4,
+    top_k=25
+)
+print(token_ids_to_text(token_ids, tokenizer))
+
+# Save the model
+torch.save(model.state_dict(), "gpt_model.pth")
+
+# Load the model
+model = GPTModel(GPT_CONFIG_124M)
+model.load_state_dict(torch.load("gpt_model.pth", map_location=device))
+model.eval()
+
+# Save the model and optimizer state
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict()
+}, "gpt_model_optimizer.pth")
+
+# Load the model and optimizer state
+checkpoint = torch.load("gpt_model_optimizer.pth", map_location=device)
+model = GPTModel(GPT_CONFIG_124M)
+model.load_state_dict(checkpoint['model_state_dict'])
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-1)
+optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+model.train()
