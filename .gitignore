@@ -1,0 +1,14 @@
+# Ignore a single file
+secret_config.py
+
+# Ignore everything in a folder
+__pycache__/
+gpt2/
+
+# Ignore all .log files
+*.log
+*.pth
+*.json
+
+# Ignore files in a subdirectory
+# logs/debug.log
