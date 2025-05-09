@@ -40,3 +40,19 @@ def create_balanced_dataset(df):
 
 balanced_df = create_balanced_dataset(df)
 print(balanced_df["label"].value_counts())
+
+balanced_df["label"] = balanced_df["label"].map({"ham": 0, "spam": 1})
+
+# Split the dataset into training, validation, and test sets
+def random_split(df, train_size, val_size):
+    df = df.sample(frac=1, random_state=123).reset_index(drop=True)
+    train_end = int(train_size * int(len(df)))
+    val_end = train_end + int(val_size * int(len(df)))
+
+    train_df = df[:train_end]
+    val_df = df[train_end:val_end]
+    test_df = df[val_end:]
+
+    return train_df, val_df, test_df
+
+train_df, val_df, test_df = random_split(balanced_df, 0.7, 0.1)
