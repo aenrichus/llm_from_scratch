@@ -168,5 +168,36 @@ if __name__ == '__main__': # Required for multiprocessing on MacOS
     print(len(val_loader))
     print(len(test_loader))
 
+# Initialize the pretrained model
+CHOOSE_MODEL = "gpt2-small (124M)"
+INPUT_PROMPT = "This is a spam message"
+BASE_CONFIG = {
+    "vocab_size": 50257,
+    "context_length": 1024,
+    "drop_rate": 0.0,
+    "qkv_bias": True
+}
+model_configs = {
+    "gpt2-small (124M)": {
+        "emb_dim": 768,
+        "n_heads": 12,
+        "n_layers": 12
+    },
+    "gpt2-medium (355M)": {
+        "emb_dim": 1024,
+        "n_heads": 16,
+        "n_layers": 24
+    },
+    "gpt2-large (774M)": {
+        "emb_dim": 1280,
+        "n_heads": 20,
+        "n_layers": 36
+    },
+    "gpt2-xl (1558M)": {
+        "emb_dim": 1600,
+        "n_heads": 25,
+        "n_layers": 48
+    }
+}
 
-
+# Load the model configuration
