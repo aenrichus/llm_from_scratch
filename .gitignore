@@ -1,9 +1,11 @@
 # Ignore a single file
 secret_config.py
+sma_spam_collection.zip
 
 # Ignore everything in a folder
 __pycache__/
 gpt2/
+sma_spam_collection/
 
 # Ignore all .log files
 *.log
