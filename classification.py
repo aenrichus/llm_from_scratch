@@ -30,3 +30,13 @@ import pandas as pd
 df = pd.read_csv(data_file_path, sep='\t', header=None, names=['label', 'message'])
 print(df)
 print(df["label"].value_counts())
+
+# Create a balanced dataset
+def create_balanced_dataset(df):
+    num_spam = df[df['label'] == 'spam'].shape[0]
+    ham_subset = df[df['label'] == 'ham'].sample(num_spam, random_state=123)
+    balanced_df = pd.concat([df[df['label'] == 'spam'], ham_subset])
+    return balanced_df
+
+balanced_df = create_balanced_dataset(df)
+print(balanced_df["label"].value_counts())
