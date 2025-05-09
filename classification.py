@@ -25,3 +25,8 @@ def download_and_extract_data(url, zip_path, extract_path, data_file_path):
     print(f"Data file extracted to {data_file_path}.")
 
 download_and_extract_data(url, zip_path, extract_path, data_file_path)
+
+import pandas as pd
+df = pd.read_csv(data_file_path, sep='\t', header=None, names=['label', 'message'])
+print(df)
+print(df["label"].value_counts())
