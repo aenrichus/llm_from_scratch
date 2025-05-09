@@ -56,3 +56,117 @@ def random_split(df, train_size, val_size):
     return train_df, val_df, test_df
 
 train_df, val_df, test_df = random_split(balanced_df, 0.7, 0.1)
+
+# Save the datasets to CSV files
+train_df.to_csv("train.csv", index=None)
+val_df.to_csv("val.csv", index=None)
+test_df.to_csv("test.csv", index=None)
+
+# Create data loaders
+import tiktoken
+tokenizer = tiktoken.get_encoding("gpt2")
+print(tokenizer.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
+
+# Set up pytorch dataset class
+import torch
+from torch.utils.data import Dataset
+
+class SpamDataset(Dataset):
+    def __init__(self, csv_file, tokenizer, max_length=None, pad_token_id=50256):
+        self.data = pd.read_csv(csv_file)
+        self.encoded_texts = [tokenizer.encode(text) for text in self.data['message']]
+        
+        if max_length is None:
+            self.max_length = self._longest_encoded_length()
+        else:
+            self.max_length = max_length
+            self.encoded_texts = [encoded_text[:self.max_length] for encoded_text in self.encoded_texts]
+
+        self.encoded_texts = [encoded_text + [pad_token_id] * (self.max_length - len(encoded_text)) for encoded_text in self.encoded_texts]
+
+    def __getitem__(self, idx):
+        encoded = self.encoded_texts[idx]
+        label = self.data.iloc[idx]['label']
+        return torch.tensor(encoded, dtype=torch.long), torch.tensor(label, dtype=torch.long)
+    
+    def __len__(self):
+        return len(self.data)
+    
+    def _longest_encoded_length(self):
+        max_length = 0
+        for encoded_text in self.encoded_texts:
+            encoded_length = len(encoded_text)
+            if encoded_length > max_length:
+                max_length = encoded_length
+        return max_length
+    
+train_dataset = SpamDataset(
+    csv_file="train.csv",
+    max_length=None,
+    tokenizer=tokenizer
+)
+
+print(train_dataset.max_length)
+
+val_dataset = SpamDataset(
+    csv_file="val.csv",
+    max_length=train_dataset.max_length,
+    tokenizer=tokenizer
+)
+test_dataset = SpamDataset(
+    csv_file="test.csv",
+    max_length=train_dataset.max_length,
+    tokenizer=tokenizer
+)
+
+# Create pytorch dataloaders
+from torch.utils.data import DataLoader
+
+num_workers = 1 # Use 0 for higher compatibility, but use up to 8 for for faster on M1 Max MBP w/ 64GB RAM
+batch_size = 8
+
+## Note: This runs the read multiple times when you add workers, and makes it so you cannot use 0 workers
+## Fix: Wrap the read into the if __name__ == '__main__' block
+if __name__ == '__main__': # Required for multiprocessing on MacOS
+    torch.manual_seed(123)
+
+    train_loader = DataLoader(
+        dataset = train_dataset,
+        batch_size = batch_size,
+        shuffle = True,
+        num_workers = num_workers,
+        persistent_workers=True, # Keep workers alive for multiple epochs
+        prefetch_factor=None, # Number of batches to prefetch
+        drop_last = True
+    )
+    val_loader = DataLoader(
+        dataset = val_dataset,
+        batch_size = batch_size,
+        shuffle = False,
+        num_workers = num_workers,
+        persistent_workers=True, # Keep workers alive for multiple epochs
+        prefetch_factor=None, # Number of batches to prefetch
+        drop_last = False
+    )
+    test_loader = DataLoader(
+        dataset = test_dataset,
+        batch_size = batch_size,
+        shuffle = False,
+        num_workers = num_workers,
+        persistent_workers=True, # Keep workers alive for multiple epochs
+        prefetch_factor=None, # Number of batches to prefetch
+        drop_last = False
+    )
+
+    for input_batch, target_batch in train_loader:
+        pass
+    print(input_batch.shape)
+    print(target_batch.shape)
+
+    # Check the number of batches in each dataloader
+    print(len(train_loader))
+    print(len(val_loader))
+    print(len(test_loader))
+
+
+

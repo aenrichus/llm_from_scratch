@@ -11,6 +11,7 @@ sma_spam_collection/
 *.log
 *.pth
 *.json
+*.csv
 
 # Ignore files in a subdirectory
 # logs/debug.log
