@@ -13,6 +13,7 @@ This repository documents my journey of **building a Large Language Model (LLM) 
 - 🧪 Loss calculation and performance metrics
 - 💾 Save/load functionality for models and optimizer states
 - 🛠️ A simple text generation interface with context input
+- 🧹 A fine-tuned version of the model for spam classification
 
 ## Why I'm Doing This
 
@@ -35,7 +36,7 @@ I've always been fascinated by the inner workings of LLMs. Rather than relying o
 ## Notes
 
 - This project is a **learning exercise**, not intended for production use.
-- I’m actively iterating on this codebase as I explore new ideas and features.
+- I’m actively iterating on this codebase as I explore new ideas and features. This includes experimenting with downstream tasks like spam classification.
 - Feedback, suggestions, and collaboration are always welcome!
 
 ## License
