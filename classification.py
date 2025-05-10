@@ -203,7 +203,7 @@ BASE_CONFIG.update(model_configs[CHOOSE_MODEL])
 
 # Load the pretrained model
 from gpt_download import download_and_load_gpt2
-from pretraining import GPTModel
+from gpt_model import GPTModel
 from load_pretrained import load_weights_into_gpt
 
 model_size = CHOOSE_MODEL.split(" ")[-1].lstrip("(").rstrip(")")
@@ -237,5 +237,8 @@ token_ids = generate_text_simple(
     context_size=BASE_CONFIG["context_length"]
 )
 print(token_ids_to_text(token_ids, tokenizer))
+
+# Look at the model architecture
+print(model)
 
 # Add a classification head to the model
