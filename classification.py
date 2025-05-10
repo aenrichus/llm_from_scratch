@@ -483,3 +483,35 @@ test_accuracy = calc_accuracy_loader(test_loader, model, device)
 print(f"Final Train accuracy: {train_accuracy*100:.2f}")
 print(f"Final Validation accuracy: {val_accuracy*100:.2f}")
 print(f"Final Test accuracy: {test_accuracy*100:.2f}")
+
+# Use the model to classify new messages
+def classify_review(text, model, tokenizer, device, max_length=None, pad_token_id=50256):
+    model.eval()
+
+    encoded_text = tokenizer.encode(text)
+    supported_context_length = model.pos_emb.weight.shape[1]
+
+    encoded_text += [pad_token_id] * (max_length - len(encoded_text))
+
+    input_tensor = torch.tensor(encoded_text, device=device).unsqueeze(0)
+
+    with torch.no_grad():
+        outputs = model(input_tensor)[::, -1, :]
+    
+    predicted_label = torch.argmax(logits, dim=-1).item()
+    
+    return "spam" if predicted_label == 1 else "ham"
+
+text_1 = "You are a winner you have been specially selected to receive $1000 cash or a $2000 award."
+print(classify_review(text_1, model, tokenizer, device, max_length=train_dataset.max_length))
+text_2 = "Hey, just wanted to check if we're still on for dinner tonight? Let me know!"
+print(classify_review(text_2, model, tokenizer, device, max_length=train_dataset.max_length))
+
+# Save the model
+torch.save(model.state_dict(), "spam_classifier.pth")
+
+# Load the model
+model_state_dict = torch.load("spam_classifier.pth", map_location=device)
+model.load_state_dict(model_state_dict)
+
+print("Model loaded successfully.")
