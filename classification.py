@@ -122,51 +122,51 @@ test_dataset = SpamDataset(
 # Create pytorch dataloaders
 from torch.utils.data import DataLoader
 
-num_workers = 1 # Use 0 for higher compatibility, but use up to 8 for for faster on M1 Max MBP w/ 64GB RAM
+num_workers = 0 # Use 0 for higher compatibility, but use up to 8 for for faster on M1 Max MBP w/ 64GB RAM
 batch_size = 8
 
 ## Note: This runs the read multiple times when you add workers, and makes it so you cannot use 0 workers
 ## Fix: Wrap the read into the if __name__ == '__main__' block
-if __name__ == '__main__': # Required for multiprocessing on MacOS
-    torch.manual_seed(123)
+# if __name__ == '__main__': # Required for multiprocessing on MacOS
+torch.manual_seed(123)
 
-    train_loader = DataLoader(
-        dataset = train_dataset,
-        batch_size = batch_size,
-        shuffle = True,
-        num_workers = num_workers,
-        persistent_workers=True, # Keep workers alive for multiple epochs
-        prefetch_factor=None, # Number of batches to prefetch
-        drop_last = True
-    )
-    val_loader = DataLoader(
-        dataset = val_dataset,
-        batch_size = batch_size,
-        shuffle = False,
-        num_workers = num_workers,
-        persistent_workers=True, # Keep workers alive for multiple epochs
-        prefetch_factor=None, # Number of batches to prefetch
-        drop_last = False
-    )
-    test_loader = DataLoader(
-        dataset = test_dataset,
-        batch_size = batch_size,
-        shuffle = False,
-        num_workers = num_workers,
-        persistent_workers=True, # Keep workers alive for multiple epochs
-        prefetch_factor=None, # Number of batches to prefetch
-        drop_last = False
-    )
+train_loader = DataLoader(
+    dataset = train_dataset,
+    batch_size = batch_size,
+    shuffle = True,
+    num_workers = num_workers,
+    # persistent_workers=True, # Keep workers alive for multiple epochs
+    # prefetch_factor=None, # Number of batches to prefetch
+    drop_last = True
+)
+val_loader = DataLoader(
+    dataset = val_dataset,
+    batch_size = batch_size,
+    shuffle = False,
+    num_workers = num_workers,
+    # persistent_workers=True, # Keep workers alive for multiple epochs
+    # prefetch_factor=None, # Number of batches to prefetch
+    drop_last = False
+)
+test_loader = DataLoader(
+    dataset = test_dataset,
+    batch_size = batch_size,
+    shuffle = False,
+    num_workers = num_workers,
+    # persistent_workers=True, # Keep workers alive for multiple epochs
+    # prefetch_factor=None, # Number of batches to prefetch
+    drop_last = False
+)
 
-    for input_batch, target_batch in train_loader:
-        pass
-    print(input_batch.shape)
-    print(target_batch.shape)
+for input_batch, target_batch in train_loader:
+    pass
+print(input_batch.shape)
+print(target_batch.shape)
 
-    # Check the number of batches in each dataloader
-    print(len(train_loader))
-    print(len(val_loader))
-    print(len(test_loader))
+# Check the number of batches in each dataloader
+print(len(train_loader))
+print(len(val_loader))
+print(len(test_loader))
 
 # Initialize the pretrained model
 CHOOSE_MODEL = "gpt2-small (124M)"
@@ -199,5 +199,43 @@ model_configs = {
         "n_layers": 48
     }
 }
+BASE_CONFIG.update(model_configs[CHOOSE_MODEL])
 
-# Load the model configuration
+# Load the pretrained model
+from gpt_download import download_and_load_gpt2
+from pretraining import GPTModel
+from load_pretrained import load_weights_into_gpt
+
+model_size = CHOOSE_MODEL.split(" ")[-1].lstrip("(").rstrip(")")
+settings, params = download_and_load_gpt2(model_size=model_size, models_dir="gpt2")
+
+model = GPTModel(BASE_CONFIG)
+load_weights_into_gpt(model, params)
+model.eval()
+
+# Test the model with a simple text generation
+from gpt_model import generate_text_simple
+from pretraining import text_to_token_ids, token_ids_to_text
+
+text_1 = "Every effort moves you"
+token_ids = generate_text_simple(
+    model=model,
+    idx=text_to_token_ids(text_1, tokenizer),
+    max_new_tokens=15,
+    context_size=BASE_CONFIG["context_length"]
+)
+print(token_ids_to_text(token_ids, tokenizer))
+
+# Test the model at spam classification
+text_2 = ("Is the following text 'spam'? Answer with 'yes' or 'no':"
+          " 'You are a winner and you have been specially"
+          " selected to receive $1000 cash or a $2000 award.'")
+token_ids = generate_text_simple(
+    model=model,
+    idx=text_to_token_ids(text_2, tokenizer),
+    max_new_tokens=23,
+    context_size=BASE_CONFIG["context_length"]
+)
+print(token_ids_to_text(token_ids, tokenizer))
+
+# Add a classification head to the model
