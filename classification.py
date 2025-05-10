@@ -239,6 +239,149 @@ token_ids = generate_text_simple(
 print(token_ids_to_text(token_ids, tokenizer))
 
 # Look at the model architecture
-print(model)
+# print(model)
 
 # Add a classification head to the model
+import torch.nn as nn
+torch.manual_seed(123)
+num_classes = 2
+model.out_head = nn.Linear(
+    in_features=BASE_CONFIG["emb_dim"],
+    out_features=num_classes
+)
+
+# Make the relevant parameters trainable
+for param in model.trf_blocks[-1].parameters():
+    param.requires_grad = True
+for param in model.final_norm.parameters():
+    param.requires_grad = True
+
+inputs = tokenizer.encode("Do you have time")
+inputs = torch.tensor(inputs).unsqueeze(0)
+print(inputs)
+print(inputs.shape)
+
+with torch.no_grad():
+    outputs = model(inputs)
+print(outputs)
+print(outputs.shape)
+
+print(outputs[:, -1, :])
+
+# Calculate classification loss and accuracy
+probas = torch.softmax(outputs[:, -1, :], dim=-1)
+label = torch.argmax(probas)
+print(label.item())
+
+# Softmax not needed for argmax
+logits = outputs[:, -1, :]
+label = torch.argmax(logits)
+print(label.item())
+
+## Calculate accuracy
+def calc_accuracy_loader(data_loader, model, device, num_batches=None):
+    model.eval()
+    correct_predictions, num_examples = 0, 0
+
+    if num_batches is None:
+        num_batches = len(data_loader)
+    else:
+        num_batches = min(num_batches, len(data_loader))
+    
+    for i, (input_batch, target_batch) in enumerate(data_loader):
+        if i < num_batches:
+            input_batch = input_batch.to(device)
+            target_batch = target_batch.to(device)
+
+            with torch.no_grad():
+                outputs = model(input_batch)
+            
+            logits = outputs[:, -1, :]
+            predictions = torch.argmax(logits, dim=-1)
+
+            num_examples += predictions.shape[0]
+            correct_predictions += (predictions == target_batch).sum().item()
+        else:
+            break
+    
+    return correct_predictions / num_examples
+
+device = torch.device("mps" if torch.mps.is_available() else "cpu")
+model.to(device)
+
+torch.manual_seed(123)
+train_accuracy = calc_accuracy_loader(
+    data_loader=train_loader,
+    model=model,
+    device=device,
+    num_batches=10
+)
+val_accuracy = calc_accuracy_loader(
+    data_loader=val_loader,
+    model=model,
+    device=device,
+    num_batches=10
+)
+test_accuracy = calc_accuracy_loader(
+    data_loader=test_loader,
+    model=model,
+    device=device,
+    num_batches=10
+)
+print(f"Train accuracy: {train_accuracy*100:.2f}")
+print(f"Validation accuracy: {val_accuracy*100:.2f}")
+print(f"Test accuracy: {test_accuracy*100:.2f}")
+
+## Calculate batch loss
+def calc_loss_batch(input_batch, target_batch, model, device):
+    input_batch = input_batch.to(device)
+    target_batch = target_batch.to(device)
+
+    outputs = model(input_batch)
+    logits = outputs[:, -1, :]
+    loss = nn.functional.cross_entropy(logits, target_batch)
+    
+    return loss
+
+## Calculate classification loss
+def calc_loss_loader(data_loader, model, device, num_batches=None):
+    total_loss = 0.0
+
+    if len(data_loader) == 0:
+        return float("nan")
+    elif num_batches is None:
+        num_batches = len(data_loader)
+    else:
+        num_batches = min(num_batches, len(data_loader))
+    
+    for i, (input_batch, target_batch) in enumerate(data_loader):
+        if i < num_batches:
+            loss = calc_loss_batch(input_batch, target_batch, model, device)
+            total_loss += loss.item()
+        else:
+            break
+    
+    return total_loss / num_batches
+
+with torch.no_grad():
+    train_loss = calc_loss_loader(
+        data_loader=train_loader,
+        model=model,
+        device=device,
+        num_batches=5
+    )
+    val_loss = calc_loss_loader(
+        data_loader=val_loader,
+        model=model,
+        device=device,
+        num_batches=5
+    )
+    test_loss = calc_loss_loader(
+        data_loader=test_loader,
+        model=model,
+        device=device,
+        num_batches=5
+    )
+print(f"Train loss: {train_loss:.4f}")
+print(f"Validation loss: {val_loss:.4f}")
+print(f"Test loss: {test_loss:.4f}")
