@@ -31,5 +31,26 @@ url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch07/01_ma
 
 data = download_and_load_file(file_path, url)
 print(f"Loaded {len(data)} instruction-response pairs.")
-print(f"Example entry: \n {data[50]}")
+print("Example entry: \n", data[50])
+print("Another entry: \n", data[999])
+
+# Implement Alpaca prompt formatting
+def format_input(entry):
+    instruction_text = (
+          f"Below is an instruction that describes a task. "
+          f"Write a response that appropriately completes the request.\n\n"
+          f"### Instruction:\n{entry['instruction']}\n\n"
+    )
+    
+    input_text = (f"### Input:\n{entry['input']}\n\n" if entry['input'] else "")
+
+    return instruction_text + input_text
+
+model_input = format_input(data[50])
+desired_response = f"### Response:\n{data[50]['output']}\n\n"
+print(model_input + desired_response)
+
+model_input = format_input(data[999])
+desired_response = f"### Response:\n{data[999]['output']}\n\n"
+print(model_input + desired_response)
 
