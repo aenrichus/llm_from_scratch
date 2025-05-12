@@ -54,3 +54,15 @@ model_input = format_input(data[999])
 desired_response = f"### Response:\n{data[999]['output']}\n\n"
 print(model_input + desired_response)
 
+# Partition the dataset for training, validation, and testing
+train_portion = int(len(data) * 0.85)
+test_portion = int(len(data) * 0.10)
+val_portion = len(data) - train_portion - test_portion
+
+train_data = data[:train_portion]
+test_data = data[train_portion:train_portion + test_portion]
+val_data = data[train_portion + test_portion:]
+
+print(f"Training data size: {len(train_data)}")
+print(f"Validation data size: {len(val_data)}")
+print(f"Testing data size: {len(test_data)}")
