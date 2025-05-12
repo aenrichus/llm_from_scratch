@@ -66,3 +66,131 @@ val_data = data[train_portion + test_portion:]
 print(f"Training data size: {len(train_data)}")
 print(f"Validation data size: {len(val_data)}")
 print(f"Testing data size: {len(test_data)}")
+
+# Implement instruction dataset class
+import torch
+from torch.utils.data import Dataset
+
+class InstructionDataset(Dataset):
+    def __init__(self, data, tokenizer):
+        self.data = data
+        self.encoded_texts = []
+        for entry in data:
+            instuction_plus_input = format_input(entry)
+            response_text = f"### Response:\n{entry['output']}\n\n"
+            full_text = instuction_plus_input + response_text
+            self.encoded_texts.append(tokenizer.encode(full_text))
+
+    def __getitem__(self, idx):
+        return self.encoded_texts[idx]
+    
+    def __len__(self):
+        return len(self.data)
+    
+import tiktoken
+tokenizer = tiktoken.get_encoding("gpt2")
+print(tokenizer.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
+
+# Create custom collate function
+def custom_collate_v1(batch, pad_token_id=50256, device="cpu"):
+    batch_max_len = max(len(item)+1 for item in batch)
+    inputs_list = []
+
+    for item in batch:
+        new_item = item.copy()
+        new_item += [pad_token_id]
+
+        padded = (new_item + [pad_token_id] * (batch_max_len - len(new_item)))
+        inputs = torch.tensor(padded[:-1])
+        inputs_list.append(inputs)
+    
+    inputs_tensor = torch.stack(inputs_list).to(device)
+    return inputs_tensor
+
+inputs_1 = [0, 1, 2, 3, 4]
+inputs_2 = [5, 6]
+inputs_3 = [7, 8, 9]
+
+batch = [inputs_1, inputs_2, inputs_3]
+print(custom_collate_v1(batch))
+
+def custom_collate_v2(batch, pad_token_id=50256, device="cpu"):
+    batch_max_len = max(len(item)+1 for item in batch)
+    inputs_list, targets_list = [], []
+
+    for item in batch:
+        new_item = item.copy()
+        new_item += [pad_token_id] * (batch_max_len - len(new_item))
+
+        padded = (new_item + [pad_token_id] * (batch_max_len - len(new_item)))
+        inputs = torch.tensor(padded[:-1])
+        targets = torch.tensor(padded[1:])
+        inputs_list.append(inputs)
+        targets_list.append(targets)
+    
+    inputs_tensor = torch.stack(inputs_list).to(device)
+    targets_tensor = torch.stack(targets_list).to(device)
+
+    return inputs_tensor, targets_tensor
+
+inputs, targets = custom_collate_v2(batch)
+print(inputs)
+print(targets)
+
+def custom_collate_fn(batch, pad_token_id=50256, ignore_index=-100, allowed_max_len=None, device="cpu"):
+    """
+    Custom collate function for DataLoader.
+    """
+    batch_max_len = max(len(item)+1 for item in batch)
+    inputs_list, targets_list = [], []
+
+    for item in batch:
+        new_item = item.copy()
+        new_item += [pad_token_id]
+
+        padded = (new_item + [pad_token_id] * (batch_max_len - len(new_item)))
+        inputs = torch.tensor(padded[:-1])
+        targets = torch.tensor(padded[1:])
+
+        mask = targets == pad_token_id
+        indices = torch.nonzero(mask).squeeze()
+        if indices.numel() > 1:
+            targets[indices[1:]] = ignore_index
+        
+        if allowed_max_len is not None:
+            inputs = inputs[:allowed_max_len]
+            targets = targets[:allowed_max_len]
+
+        inputs_list.append(inputs)
+        targets_list.append(targets)
+    
+    inputs_tensor = torch.stack(inputs_list).to(device)
+    targets_tensor = torch.stack(targets_list).to(device)
+
+    return inputs_tensor, targets_tensor
+
+inputs, targets = custom_collate_fn(batch)
+print(inputs)
+print(targets)
+
+logits_1 = torch.tensor(
+    [[-1.0, 1.0],
+     [-0.5, 1.5]]
+)
+targets_1 = torch.tensor([0, 1])
+loss_1 = torch.nn.functional.cross_entropy(logits_1, targets_1)
+print(loss_1)
+
+logits_2 = torch.tensor(
+    [[-1.0, 1.0],
+     [-0.5, 1.5],
+     [-0.5, 1.5]]
+)
+targets_2 = torch.tensor([0, 1, 1])
+loss_2 = torch.nn.functional.cross_entropy(logits_2, targets_2)
+print(loss_2)
+
+targets_3 = torch.tensor([0, 1, -100])
+loss_3 = torch.nn.functional.cross_entropy(logits_2, targets_3)
+print(loss_3)
+print("loss_1 == loss_3: ", loss_1 == loss_3)
