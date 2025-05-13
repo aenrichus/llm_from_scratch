@@ -246,3 +246,67 @@ print("Train loader:")
 for inputs, targets in train_dataloader:
     print(inputs.shape, targets.shape)
 
+# Load pretrained model
+from gpt_download import download_and_load_gpt2
+from gpt_model import GPTModel
+from load_pretrained import load_weights_into_gpt
+
+BASE_CONFIG = {
+    "vocab_size": 50257,
+    "context_length": 1024,
+    "drop_rate": 0.0,
+    "qkv_bias": True
+}
+model_configs = {
+    "gpt2-small (124M)": {
+        "emb_dim": 768,
+        "n_heads": 12,
+        "n_layers": 12
+    },
+    "gpt2-medium (355M)": {
+        "emb_dim": 1024,
+        "n_heads": 16,
+        "n_layers": 24
+    },
+    "gpt2-large (774M)": {
+        "emb_dim": 1280,
+        "n_heads": 20,
+        "n_layers": 36
+    },
+    "gpt2-xl (1558M)": {
+        "emb_dim": 1600,
+        "n_heads": 25,
+        "n_layers": 48
+    }
+}
+CHOOSE_MODEL = "gpt2-medium (355M)"
+BASE_CONFIG.update(model_configs[CHOOSE_MODEL])
+
+model_size = CHOOSE_MODEL.split(" ")[-1].lstrip("(").rstrip(")")
+
+settings, params = download_and_load_gpt2(
+    model_size=model_size,
+    models_dir="gpt2"
+)
+
+model = GPTModel(BASE_CONFIG)
+load_weights_into_gpt(model, params)
+model.eval()
+
+torch.manual_seed(123)
+input_text = format_input(val_data[0])
+print(input_text)
+
+from pretraining import generate, text_to_token_ids, token_ids_to_text
+
+token_ids = generate(
+    model=model,
+    idx=text_to_token_ids(input_text, tokenizer),
+    max_new_tokens=35,
+    context_size=BASE_CONFIG["context_length"],
+    eos_id=50256,
+)
+generated_text = token_ids_to_text(token_ids, tokenizer)
+
+response_text = generated_text[len(input_text):].strip()
+print(response_text)
