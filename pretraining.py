@@ -182,6 +182,19 @@ def train_model_simple(model, train_loader, val_loader, optimizer, device, num_e
             optimizer.zero_grad()
             loss = calc_loss_batch(input_batch, target_batch, model, device)
             loss.backward()
+
+            # Logging gradients for debugging
+            for name, param in model.named_parameters():
+                if param.grad is not None:
+                    grad = param.grad
+                    print(f"{name}: grad mean={grad.mean():.6f}, std={grad.std():.6f}, max={grad.abs().max():.6f}")
+                    grad_norm = grad.norm().item()
+                    print(f"{name}: grad norm = {grad_norm:.4f}")
+                    if grad_norm > 1000:  # Adjust threshold as needed
+                        print(f"🚨 Warning: Exploding gradient in {name}!")
+                else:
+                    print(f"{name}: grad is None")
+
             optimizer.step()
             tokens_seen += input_batch.numel()
             global_step += 1
