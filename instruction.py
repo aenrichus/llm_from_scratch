@@ -194,3 +194,55 @@ targets_3 = torch.tensor([0, 1, -100])
 loss_3 = torch.nn.functional.cross_entropy(logits_2, targets_3)
 print(loss_3)
 print("loss_1 == loss_3: ", loss_1 == loss_3)
+
+device = torch.device("mps" if torch.mps.is_available() else "cpu")
+print("Device: ", device)
+
+from functools import partial
+
+custom_collate_fn = partial(
+    custom_collate_fn,
+    allowed_max_len=1024,
+    device=device
+)
+
+# Initialize data loaders
+from torch.utils.data import DataLoader
+
+num_workers = 0
+batch_size = 8
+
+torch.manual_seed(123)
+
+train_dataset = InstructionDataset(train_data, tokenizer)
+train_dataloader = DataLoader(
+    train_dataset,
+    batch_size=batch_size,
+    shuffle=True,
+    collate_fn=custom_collate_fn,
+    num_workers=num_workers,
+    drop_last=True
+)
+val_dataset = InstructionDataset(val_data, tokenizer)
+val_dataloader = DataLoader(
+    val_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    collate_fn=custom_collate_fn,
+    num_workers=num_workers,
+    drop_last=False
+)
+test_dataset = InstructionDataset(test_data, tokenizer)
+test_dataloader = DataLoader(
+    test_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    collate_fn=custom_collate_fn,
+    num_workers=num_workers,
+    drop_last=False
+)
+
+print("Train loader:")
+for inputs, targets in train_dataloader:
+    print(inputs.shape, targets.shape)
+
