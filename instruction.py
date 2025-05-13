@@ -343,3 +343,108 @@ print(f"Execution time: {execution_time_minutes:.2f} minutes")
 from pretraining import plot_losses
 epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
 plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
+
+# Extract and save responses
+torch.manual_seed(123)
+
+for entry in test_data[:3]:
+    input_text = format_input(entry)
+    print(input_text)
+    
+    token_ids = generate(
+        model=model,
+        idx=text_to_token_ids(input_text, tokenizer).to(device),
+        max_new_tokens=256,
+        context_size=BASE_CONFIG["context_length"],
+        eos_id=50256,
+    )
+    
+    generated_text = token_ids_to_text(token_ids, tokenizer)
+    response_text = generated_text[len(input_text):].replace("### Response:", "").strip()
+    print(f"\nCorrect response:\n{entry['output']}")
+    print(f"Generated response:\n{response_text.strip()}")
+    print("-" * 50)
+
+# Generate test set responses
+from tqdm import tqdm
+
+for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
+    input_text = format_input(entry)
+    token_ids = generate(
+        model=model,
+        idx=text_to_token_ids(input_text, tokenizer).to(device),
+        max_new_tokens=256,
+        context_size=BASE_CONFIG["context_length"],
+        eos_id=50256,
+    )
+    
+    generated_text = token_ids_to_text(token_ids, tokenizer)
+    response_text = generated_text[len(input_text):].replace("### Response:", "").strip()
+    
+    test_data[i]["generated_response"] = response_text
+
+with open("instruction-data-with-response.json", "w") as file:
+    json.dump(test_data, file, indent=4)
+
+print(test_data[0])
+
+import re
+
+file_name = f"{re.sub(r'[ ()]', '', CHOOSE_MODEL)}_sft.pth"
+torch.save(model.state_dict(), file_name)
+print(f"Model saved to {file_name}")
+
+# Ensure ollama is running
+import psutil
+
+def check_if_running(process_name):
+    running = False
+    for proc in psutil.process_iter(["name"]):
+        if process_name in proc.info["name"]:
+            running = True
+            break
+    return running
+
+ollama_running = check_if_running("ollama")
+
+if not ollama_running:
+    raise RuntimeError("Ollama not running. Launch ollama before proceeding.")
+print("Ollama running: ", check_if_running("ollama"))
+
+# Query local ollama model
+import urllib.request
+
+def query_model(
+        prompt,
+        model="llama3",
+        url="http://localhost:11434/api/chat"
+):
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "options": {
+            "seed": 123,
+            "temperature": 0,
+            "num_ctx": 2048
+        }
+    }
+
+    payload = json.dumps(data).encode("utf-8")
+    request = urllib.request.Request(url, data=payload, method="POST")
+    request.add_header("Content-Type", "application/json")
+
+    response_data = ""
+    with urllib.request.urlopen(request) as response:
+        while True:
+            line = response.readline().decode("utf-8")
+            if not line:
+                break
+            response_json = json.loads(line)
+            response_data += response_json["message"]["content"]
+    
+    return response_data
+
+model = "llama3"
+result = query_model("What do Llamas eat?", model)
+print(result)
+
