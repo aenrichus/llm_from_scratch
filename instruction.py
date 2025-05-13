@@ -310,3 +310,36 @@ generated_text = token_ids_to_text(token_ids, tokenizer)
 
 response_text = generated_text[len(input_text):].strip()
 print(response_text)
+
+# Finetune on instruction data
+from pretraining import calc_loss_loader, train_model_simple
+
+model.to(device)
+torch.manual_seed(123)
+
+with torch.no_grad():
+    train_loss = calc_loss_loader(train_dataloader, model, device, num_batches=5)
+    val_loss = calc_loss_loader(val_dataloader, model, device, num_batches=5)
+
+print(f"Train loss: {train_loss:.4f}")
+print(f"Validation loss: {val_loss:.4f}")
+
+import time
+
+start_time = time.time()
+torch.manual_seed(123)
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.00005, weight_decay=0.1)
+num_epochs = 2
+
+train_losses, val_losses, tokens_seen = train_model_simple(
+    model, train_dataloader, val_dataloader, optimizer, device, num_epochs=num_epochs, 
+    eval_freq=5, eval_iter=5, start_context=format_input(val_data[0]), tokenizer=tokenizer
+)
+
+end_time = time.time()
+execution_time_minutes = (end_time - start_time) / 60
+print(f"Execution time: {execution_time_minutes:.2f} minutes")
+
+from pretraining import plot_losses
+epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
+plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
