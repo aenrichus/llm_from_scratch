@@ -375,12 +375,18 @@ for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
         idx=text_to_token_ids(input_text, tokenizer).to(device),
         max_new_tokens=256,
         context_size=BASE_CONFIG["context_length"],
-        eos_id=50256,
+        eos_id=50256
     )
     
     generated_text = token_ids_to_text(token_ids, tokenizer)
-    response_text = generated_text[len(input_text):].replace("### Response:", "").strip()
-    
+    # response_text = generated_text[len(input_text):].replace("### Response:", "").strip()
+    # Try to find where the response actually starts
+    split_marker = "### Response:"
+    if split_marker in generated_text:
+        response_text = generated_text.split(split_marker, 1)[-1].strip()
+    else:
+        response_text = generated_text.strip()
+
     test_data[i]["generated_response"] = response_text
 
 with open("instruction-data-with-response.json", "w") as file:
@@ -451,15 +457,16 @@ print(result)
 # Test the model with a few examples
 for entry in test_data[:3]:
     prompt = (
-        f"Given the input `{format_input(entry)}` "
+        f"Given the WolfGPT model input `{format_input(entry)}` "
         f"and the correct output `{entry['output']}`, "
-        f"score the model response `{entry['model_response']}` "
-        f"on a scale from 0 to 100, where 100 is the best score."
+        f"score the WolfGPT model response `{entry['generated_response']}`"
+        f" on a scale from 0 to 100, where 100 is the best score. "
+        f"Score only WolfGPT model response, not your own response."
     )
     print("\nDataset response:")
     print(">>", entry["output"])
     print("\nModel response:")
-    print(">>", entry["model_response"])
+    print(">>", entry["generated_response"])
     print("\nScore:")
     print(">>", query_model(prompt))
     print("\n", "-" * 50)
@@ -469,10 +476,11 @@ def generate_model_scores(json_data, json_key, model="llama3"):
     scores = []
     for entry in tqdm(json_data, desc="Generating scores"):
         prompt = (
-            f"Given the input `{format_input(entry)}` "
+            f"Given the WolfGPT model input `{format_input(entry)}` "
             f"and the correct output `{entry['output']}`, "
-            f"score the model response `{entry[json_key]}` "
+            f"score the WolfGPT model response `{entry[json_key]}` "
             f"on a scale from 0 to 100, where 100 is the best score. "
+            f"Score only WolfGPT model response, not your own response. "
             f"Respond with the integer number only."
         )
         score = query_model(prompt, model)
