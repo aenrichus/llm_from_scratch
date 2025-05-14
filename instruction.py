@@ -368,6 +368,27 @@ for entry in test_data[:3]:
 # Generate test set responses
 from tqdm import tqdm
 
+# for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
+#     input_text = format_input(entry)
+#     token_ids = generate(
+#         model=model,
+#         idx=text_to_token_ids(input_text, tokenizer).to(device),
+#         max_new_tokens=256,
+#         context_size=BASE_CONFIG["context_length"],
+#         eos_id=50256
+#     )
+    
+#     generated_text = token_ids_to_text(token_ids, tokenizer)
+#     # response_text = generated_text[len(input_text):].replace("### Response:", "").strip()
+#     # Try to find where the response actually starts
+#     split_marker = "### Response:"
+#     if split_marker in generated_text:
+#         response_text = generated_text.split(split_marker, 1)[-1].strip()
+#     else:
+#         response_text = generated_text.strip()
+
+#     test_data[i]["generated_response"] = response_text
+
 for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
     input_text = format_input(entry)
     token_ids = generate(
@@ -375,19 +396,33 @@ for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
         idx=text_to_token_ids(input_text, tokenizer).to(device),
         max_new_tokens=256,
         context_size=BASE_CONFIG["context_length"],
-        eos_id=50256
+        temperature=0.0,  # Use temperature to add randomness
+        top_k=None,         # Add top_k sampling
+        eos_id=50256      # Use EOS token to end generation
     )
     
     generated_text = token_ids_to_text(token_ids, tokenizer)
-    # response_text = generated_text[len(input_text):].replace("### Response:", "").strip()
-    # Try to find where the response actually starts
+    
+    # Improve response extraction
     split_marker = "### Response:"
     if split_marker in generated_text:
-        response_text = generated_text.split(split_marker, 1)[-1].strip()
+        response_parts = generated_text.split(split_marker, 1)
+        if len(response_parts) > 1:
+            response_text = response_parts[1].strip()
+            # Truncate at the next instruction if present
+            if "### Instruction:" in response_text:
+                response_text = response_text.split("### Instruction:", 1)[0].strip()
+        else:
+            response_text = "No response generated"
     else:
-        response_text = generated_text.strip()
-
+        # If response marker not found, return everything after input text
+        response_text = generated_text[len(input_text):].strip()
+        # Truncate at the next instruction if present
+        if "### Instruction:" in response_text:
+            response_text = response_text.split("### Instruction:", 1)[0].strip()
+    
     test_data[i]["generated_response"] = response_text
+
 
 with open("instruction-data-with-response.json", "w") as file:
     json.dump(test_data, file, indent=4)
@@ -483,6 +518,7 @@ def generate_model_scores(json_data, json_key, model="llama3"):
             f"Score only WolfGPT model response, not your own response. "
             f"Respond with the integer number only."
         )
+        print('<<<', entry['generated_response'], '>>>\n')
         score = query_model(prompt, model)
         try:
             scores.append(int(score))
