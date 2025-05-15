@@ -213,7 +213,6 @@ num_workers = 0
 batch_size = 8
 
 torch.manual_seed(123)
-
 train_dataset = InstructionDataset(train_data, tokenizer)
 train_dataloader = DataLoader(
     train_dataset,

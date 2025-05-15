@@ -152,7 +152,7 @@ class CausalAttention(nn.Module):
 
         attn_scores = torch.matmul(query, key.transpose(1, 2))
         attn_scores.masked_fill_(self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)
-        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+        attn_weights = torch.softmax(attn_scores / key.shape[-1]**0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
         context_vector = torch.matmul(attn_weights, value)
         return context_vector
@@ -217,7 +217,7 @@ class MultiHeadAttention(nn.Module):
         mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
 
         attn_scores.masked_fill_(mask_bool, -torch.inf)
-        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+        attn_weights = torch.softmax(attn_scores / key.shape[-1]**0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
         context_vector = torch.matmul(attn_weights, value).transpose(1, 2)
